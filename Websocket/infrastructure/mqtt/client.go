@@ -27,19 +27,21 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 		return
 	}
 
+	// Enviar por WebSocket
 	application.Manager.Broadcast(payload)
 
 	var apiURL string
 	var data map[string]interface{}
 
-	if payload.Spo2 != 0 { // Si hay un valor de SPO2, se enviará a la ruta de oxígeno
+	
+	if payload.Spo2 != 0 {
 		apiURL = apiVitals + "/oxygen/"
 		data = map[string]interface{}{
 			"user_id":     payload.UserID,
 			"measurement": payload.Spo2,
 			"device_id":   payload.DeviceId,
 		}
-	} else if payload.Bpm != 0 { // Si hay un valor de BPM, se enviará a la ruta de frecuencia cardíaca
+	} else if payload.Bpm != 0 {
 		apiURL = apiVitals + "/heartRate/"
 		data = map[string]interface{}{
 			"user_id":     payload.UserID,
@@ -47,14 +49,13 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			"device_id":   payload.DeviceId,
 		}
 	} else if payload.Bpm2 != 0 {
-
 		apiURL = apiVitals + "/heartRate/"
 		data = map[string]interface{}{
 			"user_id":     payload.UserID,
-			"measurement": payload.Bpm,
+			"measurement": payload.Bpm2,
 			"device_id":   payload.DeviceId,
 		}
-	} else if payload.Temperature != 0 { // Si hay un valor de temperatura, se enviará a la ruta de temperatura
+	} else if payload.Temperature != 0 {
 		apiURL = apiVitals + "/temperature/"
 		data = map[string]interface{}{
 			"user_id":     payload.UserID,
@@ -62,30 +63,64 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 			"device_id":   payload.DeviceId,
 		}
 	}
-	// Si se asignó una URL, hacer la solicitud HTTP POST
+
+	// Validación de condiciones anormales
+	isAnormal := false
+	var mensaje string
+
+	if payload.Temperature > 37.5 {
+		isAnormal = true
+		mensaje += fmt.Sprintf("Temperatura alta: %.1f°C. ", payload.Temperature)
+	}
+	if payload.Bpm < 60 || payload.Bpm > 100 {
+		isAnormal = true
+		mensaje += fmt.Sprintf("Ritmo cardíaco anormal: %d bpm. ", payload.Bpm)
+	}
+	if payload.Spo2 < 95 {
+		isAnormal = true
+		mensaje += fmt.Sprintf("Oxigenación baja: %d%%. ", payload.Spo2)
+	}
+
+	if isAnormal {
+		notifData := map[string]interface{}{
+			"user_id": payload.UserID,
+			"body":    mensaje,
+			"reading": false, 
+		}
+
+		notifJSON, err := json.Marshal(notifData)
+		if err != nil {
+			fmt.Println("Error al convertir notificación a JSON:", err)
+		} else {
+			resp, err := http.Post("http://localhost:8081/user/saveNotification", "application/json", bytes.NewBuffer(notifJSON))
+			if err != nil {
+				fmt.Println("Error al enviar notificación:", err)
+			} else {
+				defer resp.Body.Close()
+				fmt.Println("Notificación enviada con status:", resp.Status)
+			}
+		}
+	}
+
+	// Enviar datos a la API de vitales si hay URL definida
 	if apiURL != "" {
-		// Convertir los datos a JSON
 		jsonData, err := json.Marshal(data)
 		if err != nil {
-			fmt.Println("Error converting data to JSON:", err)
+			fmt.Println("Error al convertir data a JSON:", err)
 			return
 		}
 
-		// Hacer la solicitud HTTP POST a la API
 		resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
 		if err != nil {
-			fmt.Println("Error making HTTP request:", err)
+			fmt.Println("Error al enviar datos a la API:", err)
 			return
 		}
 		defer resp.Body.Close()
 
-		// Imprimir la respuesta de la API (opcional)
 		fmt.Printf("API response: %s\n", resp.Status)
 	} else {
 		fmt.Println("No valid data was found to send to the API")
 	}
-
-	// Enviar el mensaje a todos los clientes WebSocket
 
 	fmt.Printf("Message received in [%s]: %s\n", msg.Topic(), payloadStr)
 }
@@ -120,5 +155,4 @@ func StartMQTTClient() {
 	} else {
 		fmt.Println("Suscrito al tópico:", topic)
 	}
-
 }
