@@ -6,5 +6,6 @@ type Message struct {
 	Bpm      int `json:"bpm"`
 	Spo2     int `json:"spo2"`
 	Bpm2     int `json:"bpm2"`
+	Moving   bool  `json:"moving"`
 	Temperature float64 `json:"temperature"`
 }
