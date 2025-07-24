@@ -16,6 +16,7 @@ import (
 // Procesador de mensajes MQTT
 var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	apiVitals := os.Getenv("Api_Vitals")
+	apiUser := os.Getenv("Api_User")
 	payloadStr := string(msg.Payload())
 
 	var payload domain.Message
@@ -92,7 +93,7 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 		if err != nil {
 			fmt.Println("Error al convertir notificación a JSON:", err)
 		} else {
-			resp, err := http.Post("http://localhost:8081/user/saveNotification", "application/json", bytes.NewBuffer(notifJSON))
+			resp, err := http.Post(apiUser + "/user/saveNotification", "application/json", bytes.NewBuffer(notifJSON))
 			if err != nil {
 				fmt.Println("Error al enviar notificación:", err)
 			} else {
