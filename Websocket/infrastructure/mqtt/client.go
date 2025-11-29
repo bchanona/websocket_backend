@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/bchanona/websocket_backend/Websocket/application"
-	"github.com/bchanona/websocket_backend/Websocket/domain"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/joho/godotenv"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/bchanona/websocket_backend/Websocket/domain"
+	"github.com/bchanona/websocket_backend/Websocket/infrastructure/server"
+	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/joho/godotenv"
 )
 
 // Procesador de mensajes MQTT
@@ -29,7 +30,7 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 	}
 
 	// Enviar por WebSocket
-	application.Manager.Broadcast(payload)
+	server.Manager.SendToUser(payload.UserID,payload)
 
 	var apiURL string
 	var data map[string]interface{}

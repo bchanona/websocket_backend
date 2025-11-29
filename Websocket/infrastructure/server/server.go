@@ -1,33 +1,46 @@
 package server
 
 import (
+	"encoding/json"
+	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-
-	"github.com/bchanona/websocket_backend/Websocket/application"
-	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-// Manejador de conexiones WebSocket
 func WSHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Error upgrading to WebSocket:", err)
+		log.Println("Upgrade error:", err)
 		return
 	}
-	defer conn.Close()
 
-	application.Manager.AddClient(conn)
-	defer application.Manager.RemoveClient(conn)
+	// Primer mensaje debe ser el user_id
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		conn.Close()
+		return
+	}
 
-	// Mantener la conexión abierta
+	var initData struct {
+		UserID int `json:"user_id"`
+	}
+	if err := json.Unmarshal(msg, &initData); err != nil || initData.UserID == 0 {
+		conn.Close()
+		return
+	}
+
+	userID := initData.UserID
+
+	Manager.AddClient(userID, conn)
+	defer Manager.RemoveClient(userID, conn)
+
+	// Mantener conexión viva
 	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
+		if _, _, err := conn.ReadMessage(); err != nil {
 			break
 		}
 	}
