@@ -30,7 +30,7 @@ var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Messa
 	}
 
 	// Enviar por WebSocket
-	server.Manager.SendToUserDevice(payload.UserID,payload.UserID,payload)
+	server.Manager.SendToUserDevice(payload.UserID,payload.DeviceId,payload)
 
 	var apiURL string
 	var data map[string]interface{}
