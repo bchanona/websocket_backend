@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 
 	"github.com/bchanona/websocket_backend/Websocket/domain"
@@ -11,32 +10,41 @@ import (
 
 // ClientManager gestiona las conexiones WebSocket activas
 type ClientManager struct {
-	mu       sync.Mutex
-    clients  map[int]map[*websocket.Conn]bool // userID → conexiones
+    mu      sync.Mutex
+    clients map[int]map[int]map[*websocket.Conn]bool
 }
 
 var Manager = ClientManager{
-	 clients: make(map[int]map[*websocket.Conn]bool),
+    clients: make(map[int]map[int]map[*websocket.Conn]bool),
 }
 
-func (cm *ClientManager) AddClient(userID int, conn *websocket.Conn) {
+func (cm *ClientManager) AddClient(userID, deviceID int, conn *websocket.Conn) {
     cm.mu.Lock()
     defer cm.mu.Unlock()
 
     if cm.clients[userID] == nil {
-        cm.clients[userID] = make(map[*websocket.Conn]bool)
+        cm.clients[userID] = make(map[int]map[*websocket.Conn]bool)
     }
-    cm.clients[userID][conn] = true
+    if cm.clients[userID][deviceID] == nil {
+        cm.clients[userID][deviceID] = make(map[*websocket.Conn]bool)
+    }
+
+    cm.clients[userID][deviceID][conn] = true
 }
 
 
+
 // Remover un cliente WebSocket
-func (cm *ClientManager) RemoveClient(userID int, conn *websocket.Conn) {
+func (cm *ClientManager) RemoveClient(userID, deviceID int, conn *websocket.Conn) {
     cm.mu.Lock()
     defer cm.mu.Unlock()
 
-    if cm.clients[userID] != nil {
-        delete(cm.clients[userID], conn)
+    if cm.clients[userID] != nil && cm.clients[userID][deviceID] != nil {
+        delete(cm.clients[userID][deviceID], conn)
+
+        if len(cm.clients[userID][deviceID]) == 0 {
+            delete(cm.clients[userID], deviceID)
+        }
         if len(cm.clients[userID]) == 0 {
             delete(cm.clients, userID)
         }
@@ -44,26 +52,28 @@ func (cm *ClientManager) RemoveClient(userID int, conn *websocket.Conn) {
 }
 
 
-func (cm *ClientManager) SendToUser(userID int, message domain.Message) {
+
+func (cm *ClientManager) SendToUserDevice(userID, deviceID int, msg domain.Message) {
     cm.mu.Lock()
     defer cm.mu.Unlock()
 
-    conns, ok := cm.clients[userID]
+    devices, ok := cm.clients[userID]
     if !ok {
-        return // usuario no conectado
-    }
-
-    jsonMsg, err := json.Marshal(message)
-    if err != nil {
-        log.Println("Error serializing message:", err)
         return
     }
 
+    conns, ok := devices[deviceID]
+    if !ok {
+        return
+    }
+
+    jsonMsg, _ := json.Marshal(msg)
+
     for conn := range conns {
         if err := conn.WriteMessage(websocket.TextMessage, jsonMsg); err != nil {
-            log.Println("Error sending message:", err)
             conn.Close()
             delete(conns, conn)
         }
     }
 }
+

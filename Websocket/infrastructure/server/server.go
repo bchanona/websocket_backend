@@ -27,6 +27,7 @@ func WSHandler(w http.ResponseWriter, r *http.Request) {
 
 	var initData struct {
 		UserID int `json:"user_id"`
+		DeviceID int `json:"device_id"`
 	}
 	if err := json.Unmarshal(msg, &initData); err != nil || initData.UserID == 0 {
 		conn.Close()
@@ -34,9 +35,10 @@ func WSHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := initData.UserID
+	deviceID := initData.DeviceID
 
-	Manager.AddClient(userID, conn)
-	defer Manager.RemoveClient(userID, conn)
+	Manager.AddClient(userID,deviceID, conn)
+	defer Manager.RemoveClient(userID, deviceID, conn)
 
 	// Mantener conexión viva
 	for {
