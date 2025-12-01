@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/bchanona/websocket_backend/Websocket/domain"
@@ -59,21 +60,34 @@ func (cm *ClientManager) SendToUserDevice(userID, deviceID int, msg domain.Messa
 
     devices, ok := cm.clients[userID]
     if !ok {
+        // Usuario no conectado
+        fmt.Printf("[WS] No hay conexiones para user_id=%d\n", userID)
         return
     }
 
     conns, ok := devices[deviceID]
     if !ok {
+        // Usuario conectado, pero no ese dispositivo
+        fmt.Printf("[WS] No hay conexiones para user_id=%d device_id=%d\n", userID, deviceID)
         return
     }
 
-    jsonMsg, _ := json.Marshal(msg)
+    jsonMsg, err := json.Marshal(msg)
+    if err != nil {
+        fmt.Println("[WS] Error al serializar mensaje:", err)
+        return
+    }
 
     for conn := range conns {
         if err := conn.WriteMessage(websocket.TextMessage, jsonMsg); err != nil {
+            fmt.Printf("[WS] Error enviando a user_id=%d device_id=%d: %v\n", userID, deviceID, err)
             conn.Close()
             delete(conns, conn)
+        } else {
+            fmt.Printf("[WS] Mensaje enviado a user_id=%d device_id=%d\n", userID, deviceID)
         }
     }
 }
+
+
 
