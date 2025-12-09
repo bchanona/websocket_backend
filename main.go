@@ -10,8 +10,9 @@ import (
 
 func main() {
 	routes.SetupRoutes()
-
+	mqtt.InitDynamicPool(5000)
 	go mqtt.StartMQTTClient()
+	
 
 	err := http.ListenAndServe(":8082", nil)
 	if err != nil {
